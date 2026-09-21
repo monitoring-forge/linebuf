@@ -57,18 +57,19 @@ func New(opts ...Option) *Scanner {
 	return s
 }
 
+var errIterationStopped = errors.New("iteration stopped")
+
 // Iter returns a sequence of lines from the provided reader. Any error encountered during iteration can be retrieved using IterErr.
 func (s *Scanner) Iter(r io.Reader) iter.Seq[[]byte] {
-	stopErr := errors.New("iteration stopped")
 	s.iterErr = nil
 	return func(yield func([]byte) bool) {
 		err := s.Scan(r, func(data []byte) error {
 			if !yield(data) {
-				return stopErr
+				return errIterationStopped
 			}
 			return nil
 		})
-		if err != nil && err != stopErr { //nolint:errorlint,staticcheck
+		if err != nil && err != errIterationStopped { //nolint:errorlint,staticcheck
 			s.iterErr = err
 		}
 	}
@@ -126,6 +127,8 @@ func callCB(cb CB, line []byte) error {
 
 // Scan reads from the provided reader and invokes the callback for each line. It returns an error if any occurs during scanning.
 func (s *Scanner) Scan(r io.Reader, cb CB) error {
+	// reset the offset before starting the scan
+	s.offset = 0
 	for {
 		err := s.scanInternal(r, cb)
 		if err != nil && err == io.EOF { //nolint:staticcheck,errorlint

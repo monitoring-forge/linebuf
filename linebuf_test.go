@@ -4,37 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"math"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
-
-func radixInput(n int, distribution string) []float64 {
-	r := rand.New(rand.NewPCG(1, 2))
-	points := make([]float64, n)
-	for i := range points {
-		switch distribution {
-		case "duplicates":
-			points[i] = float64(i%100) + 0.5
-		case "random":
-			points[i] = r.Float64() * 10000
-		case "wide":
-			points[i] = math.Float64frombits(r.Uint64() & 0x7fefffffffffffff)
-		case "sorted":
-			points[i] = float64(i)
-		case "equal":
-			points[i] = 42
-		case "response_time":
-			points[i] = float64(r.IntN(500)) / 1000
-		}
-	}
-	return points
-}
 
 func TestScanBufferProcessChunk(t *testing.T) {
 	lines := []string{}
@@ -206,6 +184,26 @@ func TestScanBufferScanFileLongLine(t *testing.T) {
 	require.Equal(t, []string{strings.TrimSuffix(longLine, "\n")}, lines)
 }
 
+func TestResetScannerOffset(t *testing.T) {
+	sb := New(WithStartBufSize(32))
+	lines := []string{}
+	cb := func(data []byte) error {
+		lines = append(lines, string(data))
+		return nil
+	}
+	r := strings.NewReader("a\nb\nc")
+	err := sb.Scan(r, cb)
+	require.NoError(t, err)
+	require.Equal(t, []string{"a", "b", "c"}, lines)
+
+	r = strings.NewReader("d\ne\nf")
+	lines = []string{}
+	err = sb.Scan(r, cb)
+	require.NoError(t, err)
+	require.Equal(t, []string{"d", "e", "f"}, lines)
+
+}
+
 func TestCallCB(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -283,6 +281,29 @@ func TestIterErr(t *testing.T) {
 	require.Equal(t, testErr, s.IterErr())
 }
 
+func generateBenchmarkFile(b testing.TB, w io.Writer, numLines int) error {
+	b.Helper()
+	r := rand.New(rand.NewPCG(1, 2))
+	for i := range numLines {
+		line := fmt.Sprintf(`{"time": "%s", "status": "%d", "reqtime": "%f", "host": "%s", "req": "%s", "method": "%s", "size": "%d", "ua": "%s"}`,
+			time.Now().Format(time.RFC3339),
+			200+i%5,
+			float64(r.IntN(500))/1000,
+			"10.20.30.40",
+			"GET /example/path HTTP/1.1",
+			"GET",
+			941,
+			"Mozilla/5.0 (Linux; Android 4.4.2; SO-01F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.90 Mobile Safari/537.36",
+		)
+		_, err := w.Write([]byte(line + "\n"))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func testFileBuilder(b testing.TB, count int) (*os.File, error) {
 	dir := b.TempDir()
 	filePath := filepath.Join(dir, "testfile.txt")
@@ -290,41 +311,41 @@ func testFileBuilder(b testing.TB, count int) (*os.File, error) {
 	if err != nil {
 		b.Fatal(err)
 	}
-
-	for _, f := range radixInput(count, "random") {
-		_, err := fmt.Fprintf(file, "%.3f\n", f)
-		if err != nil {
-			b.Fatal(err)
-		}
+	err = generateBenchmarkFile(b, file, count)
+	if err != nil {
+		b.Fatal(err)
 	}
 	return file, nil
 }
 
+var benchmarkStartBufSize = 8192
+var benchmarkFileLines = 10000
+
 func BenchmarkScan_bufio(b *testing.B) {
-	file, err := testFileBuilder(b, 10000)
+	file, err := testFileBuilder(b, benchmarkFileLines)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer file.Close()
 	b.ResetTimer()
 	b.ReportAllocs()
+	buf := make([]byte, 0, benchmarkStartBufSize)
 	for b.Loop() {
 		_, _ = file.Seek(0, io.SeekStart)
 		scanner := bufio.NewScanner(file)
+		scanner.Buffer(buf, 64*1024)
 		total := 0
 		for scanner.Scan() {
 			b := scanner.Bytes()
 			total += len(b)
 		}
-		if err := scanner.Err(); err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(b, scanner.Err())
 	}
 }
 
 func BenchmarkScan_linebuf(b *testing.B) {
 
-	file, err := testFileBuilder(b, 10000)
+	file, err := testFileBuilder(b, benchmarkFileLines)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -336,27 +357,28 @@ func BenchmarkScan_linebuf(b *testing.B) {
 		total += len(data)
 		return nil
 	}
+	s := New(WithStartBufSize(benchmarkStartBufSize), WithMaxBufSize(64*1024))
 	for b.Loop() {
 		_, _ = file.Seek(0, io.SeekStart)
 		total = 0
-		err := Scan(file, cb, WithStartBufSize(4096), WithMaxBufSize(64*1024))
+		err := s.Scan(file, cb)
 		require.NoError(b, err)
 	}
 }
 
 func BenchmarkScan_iter(b *testing.B) {
-	file, err := testFileBuilder(b, 10000)
+	file, err := testFileBuilder(b, benchmarkFileLines)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer file.Close()
 	b.ResetTimer()
 	b.ReportAllocs()
-	total := 0
+	// reusable scanner
+	s := New(WithStartBufSize(benchmarkStartBufSize), WithMaxBufSize(64*1024))
 	for b.Loop() {
 		_, _ = file.Seek(0, io.SeekStart)
-		total = 0
-		s := New(WithStartBufSize(4096), WithMaxBufSize(64*1024))
+		total := 0
 		for res := range s.Iter(file) {
 			total += len(res)
 		}
