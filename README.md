@@ -6,8 +6,7 @@ A fast, bounded-memory line scanner for Go.
 
 - Callback and Go 1.23 iterator APIs
 - Configurable initial and maximum buffer sizes
-- `
-` trimming for Windows-style line endings
+- trimming for Windows-style line endings
 - Memory-bounded long-line handling via `ErrTokenTooLong`
 - Race-tested
 
