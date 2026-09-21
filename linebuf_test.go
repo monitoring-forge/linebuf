@@ -117,7 +117,7 @@ func TestScanBufferExpand(t *testing.T) {
 }
 
 func TestScanBufferExpandMax(t *testing.T) {
-	sb := New(WithMaxBufSize(16))
+	sb := New(WithStartBufSize(16), WithMaxBufSize(16))
 
 	err := sb.expand(16)
 	require.ErrorIs(t, err, ErrTokenTooLong)

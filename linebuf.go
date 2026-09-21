@@ -52,6 +52,7 @@ func New(opts ...Option) *Scanner {
 	for _, opt := range opts {
 		opt(s)
 	}
+	s.MaxBufSize = max(s.StartBufSize, s.MaxBufSize)
 	s.buf = make([]byte, s.StartBufSize)
 	return s
 }
