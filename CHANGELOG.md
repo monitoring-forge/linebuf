@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.0.3](https://github.com/monitoring-forge/linebuf/compare/v0.0.2...v0.0.3) - 2026-11-03
+
+- Sync files with `monitoring-forge/github-common` by @monitoring-forge-files-sync-action[bot] in https://github.com/monitoring-forge/linebuf/pull/8
+- ci: bump Songmu/tagpr from 1.20.3 to 1.21.1 in the dependencies group by @dependabot[bot] in https://github.com/monitoring-forge/linebuf/pull/10
+- Sync files with `monitoring-forge/github-common` by @monitoring-forge-files-sync-action[bot] in https://github.com/monitoring-forge/linebuf/pull/11
+- ci: bump Songmu/tagpr from 1.21.1 to 1.21.2 in the tagpr group by @dependabot[bot] in https://github.com/monitoring-forge/linebuf/pull/12
+- ci: bump actions/create-github-app-token from 3.2.0 to 3.3.0 in the dependencies group by @dependabot[bot] in https://github.com/monitoring-forge/linebuf/pull/13
+- ci: bump Songmu/tagpr from 1.21.2 to 1.21.3 in the tagpr group by @dependabot[bot] in https://github.com/monitoring-forge/linebuf/pull/15
+- ci: bump Songmu/tagpr from 1.21.3 to 1.21.4 in the tagpr group by @dependabot[bot] in https://github.com/monitoring-forge/linebuf/pull/16
+- Sync files with `monitoring-forge/github-common` by @monitoring-forge-files-sync-action[bot] in https://github.com/monitoring-forge/linebuf/pull/14
+- go: bump go.yaml.in/yaml/v3 from 3.0.5 to 3.0.6 in the dependencies group by @dependabot[bot] in https://github.com/monitoring-forge/linebuf/pull/17
+
 ## [v0.0.2](https://github.com/monitoring-forge/linebuf/compare/v0.0.1...v0.0.2) - 2026-09-21
 
 - reset offset and refactor bench by @kazeburo in https://github.com/monitoring-forge/linebuf/pull/4
